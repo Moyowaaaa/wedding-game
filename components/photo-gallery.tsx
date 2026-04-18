@@ -106,7 +106,7 @@ function VideoHero({ src, onEnded }: { src: string; onEnded: () => void }) {
         <button
           onClick={togglePlay}
           aria-label={playing ? "Pause video" : "Play video"}
-          className="pointer-events-auto p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors"
+          className="pointer-events-auto p-2 rounded-full bg-black/50 backdrop-blur-sm hover:bg-black/70 text-white transition-all shadow-lg shadow-black/20"
         >
           {playing ? (
             <Pause className="w-4 h-4" />
@@ -117,7 +117,7 @@ function VideoHero({ src, onEnded }: { src: string; onEnded: () => void }) {
         <button
           onClick={toggleMute}
           aria-label={muted ? "Unmute" : "Mute"}
-          className="pointer-events-auto p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors"
+          className="pointer-events-auto p-2 rounded-full bg-black/50 backdrop-blur-sm hover:bg-black/70 text-white transition-all shadow-lg shadow-black/20"
         >
           {muted ? (
             <VolumeX className="w-4 h-4" />
@@ -126,7 +126,7 @@ function VideoHero({ src, onEnded }: { src: string; onEnded: () => void }) {
           )}
         </button>
         {muted && (
-          <span className="pointer-events-none px-2 py-1 rounded-full bg-black/50 text-white text-[11px] font-medium">
+          <span className="pointer-events-none px-2 py-1 rounded-full bg-black/50 backdrop-blur-sm text-white text-[11px] font-medium shadow-lg shadow-black/20">
             Tap to unmute
           </span>
         )}
@@ -134,7 +134,7 @@ function VideoHero({ src, onEnded }: { src: string; onEnded: () => void }) {
 
       {/* Scrub bar */}
       <div className="absolute inset-x-0 bottom-0 pb-24 sm:pb-32 px-4 sm:px-6 pointer-events-none">
-        <div className="pointer-events-auto">
+        <div className="pointer-events-auto p-3 rounded-full max-w-[calc(100%-2rem)] mx-auto opacity-0 transition-all duration-200 group-hover:opacity-100 peer-hover:opacity-100 group-hover:bg-black/40 group-hover:backdrop-blur-sm group-hover:shadow-lg group-hover:shadow-black/20 peer-hover:bg-black/40 peer-hover:backdrop-blur-sm peer-hover:shadow-lg peer-hover:shadow-black/20">
           <input
             type="range"
             min={0}
@@ -143,7 +143,7 @@ function VideoHero({ src, onEnded }: { src: string; onEnded: () => void }) {
             value={currentTime}
             onChange={handleScrub}
             aria-label="Seek"
-            className="w-full h-1 appearance-none bg-white/30 rounded-full outline-none cursor-pointer opacity-0 transition-opacity duration-200 group-hover:opacity-100 peer-hover:opacity-100"
+            className="w-full h-1 appearance-none bg-white/30 rounded-full outline-none cursor-pointer"
             style={{
               background: `linear-gradient(to right, #f09a36 ${pct}%, rgba(255,255,255,0.3) ${pct}%)`,
             }}
@@ -264,7 +264,7 @@ export function PhotoGallery() {
       <div className="flex items-center justify-center py-16">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading photos...</p>
+          <p className="text-muted-foreground">Loading media ...</p>
         </div>
       </div>
     );
@@ -358,14 +358,14 @@ export function PhotoGallery() {
                 <button
                   onClick={prev}
                   aria-label="Previous photo"
-                  className="pointer-events-auto absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+                  className="pointer-events-auto absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 backdrop-blur-sm hover:bg-black/60 text-white transition-all shadow-lg shadow-black/20"
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
                 <button
                   onClick={next}
                   aria-label="Next photo"
-                  className="pointer-events-auto absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+                  className="pointer-events-auto absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 backdrop-blur-sm hover:bg-black/60 text-white transition-all shadow-lg shadow-black/20"
                 >
                   <ChevronRight className="w-5 h-5" />
                 </button>
@@ -376,7 +376,7 @@ export function PhotoGallery() {
             <button
               onClick={() => setIsFullscreen(true)}
               aria-label="Fullscreen"
-              className="pointer-events-auto absolute top-3 right-3 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+              className="pointer-events-auto absolute top-3 right-3 p-2 rounded-full bg-black/40 backdrop-blur-sm hover:bg-black/60 text-white transition-all shadow-lg shadow-black/20"
             >
               <Maximize2 className="w-4 h-4" />
             </button>
@@ -434,12 +434,14 @@ export function PhotoGallery() {
           <button
             onClick={() => setIsFullscreen(false)}
             aria-label="Exit fullscreen"
-            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+            className="absolute
+            z-[9999999]
+            top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
           >
             <X className="w-6 h-6" />
           </button>
 
-          <div className="relative w-full h-full max-w-6xl max-h-[90vh]">
+          <div className="relative w-full h-full max-w-full max-h-screen ">
             {active.mediaType === "video" ? (
               <VideoHero
                 key={active.id}
@@ -455,9 +457,36 @@ export function PhotoGallery() {
                 alt={active.challenge}
                 fill
                 sizes="100vw"
-                className="object-contain"
+                className="object-cover"
               />
             )}
+
+            {/* Fullscreen metadata overlay */}
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-6 text-white">
+              <div className="inline-block bg-accent text-accent-foreground px-3 py-1 rounded text-sm font-medium mb-2">
+                {active.challenge}
+              </div>
+              <p className="font-serif text-xl sm:text-2xl font-semibold">
+                {active.guestName}
+              </p>
+              {active.caption && (
+                <p className="text-base sm:text-lg italic text-white/90 mt-1">
+                  "{active.caption}"
+                </p>
+              )}
+              <p className="text-sm text-white/70 mt-2">
+                {new Intl.DateTimeFormat("en-GB", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                }).format(new Date(active.timestamp))}{" "}
+                at{" "}
+                {new Intl.DateTimeFormat("en-GB", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }).format(new Date(active.timestamp))}
+              </p>
+            </div>
 
             {/* Fullscreen controls */}
             <div className="absolute inset-0 pointer-events-none">
@@ -466,14 +495,14 @@ export function PhotoGallery() {
                   <button
                     onClick={prev}
                     aria-label="Previous photo"
-                    className="pointer-events-auto absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+                    className="pointer-events-auto absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white transition-all shadow-lg shadow-black/30"
                   >
                     <ChevronLeft className="w-6 h-6" />
                   </button>
                   <button
                     onClick={next}
                     aria-label="Next photo"
-                    className="pointer-events-auto absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+                    className="pointer-events-auto absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white transition-all shadow-lg shadow-black/30"
                   >
                     <ChevronRight className="w-6 h-6" />
                   </button>

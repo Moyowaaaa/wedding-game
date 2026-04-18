@@ -82,6 +82,17 @@ export function PhotoCapture({
     const file = e.target.files?.[0];
     if (file) {
       const isVideo = file.type.startsWith("video/");
+
+      // Check file size limits
+      const maxSize = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024; // 100MB for videos, 10MB for photos
+      if (file.size > maxSize) {
+        alert(
+          `File too large! ${isVideo ? "Videos" : "Photos"} must be under ${isVideo ? "100MB" : "10MB"}.`,
+        );
+        e.target.value = ""; // Clear the input
+        return;
+      }
+
       const objectUrl = URL.createObjectURL(file);
       setPreview(objectUrl);
       setPreviewType(isVideo ? "video" : "image");
@@ -201,6 +212,9 @@ export function PhotoCapture({
               Upload Video
             </Button>
           </div>
+          <p className="text-xs text-muted-foreground text-center">
+            Photos: max 10MB | Videos: max 100MB
+          </p>
           <input
             ref={photoUploadRef}
             type="file"
