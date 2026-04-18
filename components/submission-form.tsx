@@ -1,17 +1,49 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Card } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { PHOTO_CHALLENGES } from './photo-checklist'
-import { Loader2 } from 'lucide-react'
+import { useState } from "react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import { PHOTO_CHALLENGES } from "./photo-checklist";
+import { Loader2 } from "lucide-react";
+
+type UploadStage = "idle" | "uploading" | "saving" | "done";
+
+function uploadWithProgress(
+  url: string,
+  formData: FormData,
+  onProgress: (pct: number) => void,
+): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText));
+        } catch {
+          reject(new Error("Invalid server response"));
+        }
+      } else {
+        reject(new Error(`Upload failed (${xhr.status})`));
+      }
+    };
+    xhr.onerror = () => reject(new Error("Network error during upload"));
+    xhr.send(formData);
+  });
+}
 
 interface SubmissionFormProps {
-  challenge: number
-  photoFile: File
-  onComplete: () => void
-  onBack: () => void
+  challenge: number;
+  photoFile: File;
+  onComplete: () => void;
+  onBack: () => void;
 }
 
 export function SubmissionForm({
@@ -20,63 +52,69 @@ export function SubmissionForm({
   onComplete,
   onBack,
 }: SubmissionFormProps) {
-  const [guestName, setGuestName] = useState('')
-  const [caption, setCaption] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [guestName, setGuestName] = useState("");
+  const [caption, setCaption] = useState("");
+  const [stage, setStage] = useState<UploadStage>("idle");
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
-  const challengeData = PHOTO_CHALLENGES.find((c) => c.id === challenge)
+  const isSubmitting = stage === "uploading" || stage === "saving";
+
+  const challengeData = PHOTO_CHALLENGES.find((c) => c.id === challenge);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
+    e.preventDefault();
 
     if (!guestName.trim()) {
-      setError('Please enter your name')
-      return
+      setError("Please enter your name");
+      return;
     }
 
-    setIsSubmitting(true)
-    setError(null)
+    setError(null);
+    setProgress(0);
+    setStage("uploading");
 
     try {
-      // Upload photo to Cloudinary
-      const uploadFormData = new FormData()
-      uploadFormData.append('file', photoFile)
+      // 1. Upload photo to Cloudinary with real progress
+      const uploadFormData = new FormData();
+      uploadFormData.append("file", photoFile);
 
-      const uploadResponse = await fetch('/api/upload', {
-        method: 'POST',
-        body: uploadFormData,
-      })
+      const uploadedData = await uploadWithProgress(
+        "/api/upload",
+        uploadFormData,
+        (pct) => setProgress(pct),
+      );
+      const imageUrl = uploadedData.secure_url;
+      if (!imageUrl)
+        throw new Error("Upload succeeded but no image URL returned");
 
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to upload photo')
-      }
+      // 2. Save submission metadata (quick, indeterminate)
+      setStage("saving");
+      setProgress(100);
 
-      const uploadedData = await uploadResponse.json()
-      const imageUrl = uploadedData.secure_url
-
-      // Save submission with image URL
-      const submissionResponse = await fetch('/api/submissions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const submissionResponse = await fetch("/api/submissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           guestName,
-          challenge: challengeData?.title || '',
+          challenge: challengeData?.title || "",
           caption,
           imageUrl,
         }),
-      })
+      });
 
       if (!submissionResponse.ok) {
-        throw new Error('Failed to save submission')
+        throw new Error("Failed to save submission");
       }
 
-      onComplete()
+      setStage("done");
+      onComplete();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
-      setIsSubmitting(false)
+      setError(err instanceof Error ? err.message : "An error occurred");
+      setStage("idle");
+      setProgress(0);
     }
-  }
+  };
 
   return (
     <div className="space-y-6">
@@ -99,7 +137,10 @@ export function SubmissionForm({
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
-            <label htmlFor="name" className="block text-sm font-medium text-foreground">
+            <label
+              htmlFor="name"
+              className="block text-sm font-medium text-foreground"
+            >
               Your Name *
             </label>
             <Input
@@ -115,7 +156,10 @@ export function SubmissionForm({
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="caption" className="block text-sm font-medium text-foreground">
+            <label
+              htmlFor="caption"
+              className="block text-sm font-medium text-foreground"
+            >
               Add a Caption (Optional)
             </label>
             <textarea
@@ -131,6 +175,22 @@ export function SubmissionForm({
               {caption.length}/200 characters
             </p>
           </div>
+
+          {isSubmitting && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  {stage === "uploading"
+                    ? `Uploading photo… ${progress}%`
+                    : "Saving submission…"}
+                </span>
+                {stage === "saving" && (
+                  <Loader2 className="w-4 h-4 animate-spin text-accent" />
+                )}
+              </div>
+              <Progress value={stage === "saving" ? 100 : progress} />
+            </div>
+          )}
 
           {error && (
             <div className="p-3 rounded-md bg-red-50 border border-red-200 text-sm text-red-700">
@@ -159,12 +219,12 @@ export function SubmissionForm({
                   Uploading...
                 </>
               ) : (
-                'Submit Photo'
+                "Submit Photo"
               )}
             </Button>
           </div>
         </form>
       </div>
     </div>
-  )
+  );
 }

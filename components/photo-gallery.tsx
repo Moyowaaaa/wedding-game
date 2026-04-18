@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
 import {
   supabase,
   SUBMISSIONS_TABLE,
   type Submission as DbSubmission,
 } from "@/lib/supabase";
+
+const AUTOPLAY_MS = 4500;
 
 interface Submission {
   id: string;
@@ -32,6 +34,9 @@ function fromDb(row: DbSubmission): Submission {
 export function PhotoGallery() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const thumbRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,6 +79,59 @@ export function PhotoGallery() {
     };
   }, []);
 
+  // Clamp active index when the list shrinks; keep position when items prepend.
+  useEffect(() => {
+    if (submissions.length === 0) return;
+    if (activeIndex >= submissions.length) setActiveIndex(0);
+  }, [submissions.length, activeIndex]);
+
+  const goTo = useCallback(
+    (index: number) => {
+      if (submissions.length === 0) return;
+      const next =
+        ((index % submissions.length) + submissions.length) %
+        submissions.length;
+      setActiveIndex(next);
+    },
+    [submissions.length],
+  );
+
+  const next = useCallback(() => goTo(activeIndex + 1), [activeIndex, goTo]);
+  const prev = useCallback(() => goTo(activeIndex - 1), [activeIndex, goTo]);
+
+  // Autoplay
+  useEffect(() => {
+    if (!isPlaying || submissions.length <= 1) return;
+    const t = setInterval(() => {
+      setActiveIndex((i) => (i + 1) % submissions.length);
+    }, AUTOPLAY_MS);
+    return () => clearInterval(t);
+  }, [isPlaying, submissions.length]);
+
+  // Keyboard nav
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") next();
+      else if (e.key === "ArrowLeft") prev();
+      else if (e.key === " ") {
+        e.preventDefault();
+        setIsPlaying((p) => !p);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [next, prev]);
+
+  // Keep active thumbnail in view
+  useEffect(() => {
+    const el = thumbRefs.current[activeIndex];
+    el?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  }, [activeIndex]);
+
   if (loading && submissions.length === 0) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -100,56 +158,122 @@ export function PhotoGallery() {
     );
   }
 
+  const active = submissions[activeIndex];
+
   return (
     <div className="space-y-6">
-      <div className="text-center mb-8">
+      <div className="text-center mb-2">
         <h2 className="text-3xl font-serif font-bold text-foreground mb-2">
           Guest Photos
         </h2>
         <p className="text-muted-foreground">
-          {submissions.length} photos uploaded
+          {submissions.length} photo{submissions.length === 1 ? "" : "s"}{" "}
+          uploaded
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {submissions.map((submission) => (
-          <Card
-            key={submission.id}
-            className="overflow-hidden hover:shadow-lg transition-shadow"
-          >
-            <CardContent className="p-0">
-              <div className="relative aspect-square bg-secondary overflow-hidden">
-                <Image
-                  src={submission.imageUrl}
-                  alt={submission.challenge}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                />
-              </div>
-            </CardContent>
-            <CardHeader className="pb-3">
-              <div className="space-y-2">
-                <div className="inline-block bg-accent/10 text-accent px-2 py-1 rounded text-xs font-medium">
-                  {submission.challenge}
-                </div>
-                <div>
-                  <p className="font-semibold text-foreground text-sm">
-                    {submission.guestName}
-                  </p>
-                  {submission.caption && (
-                    <p className="text-muted-foreground text-sm mt-1 italic">
-                      "{submission.caption}"
-                    </p>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground pt-2">
-                  {new Date(submission.timestamp).toLocaleString()}
-                </p>
-              </div>
-            </CardHeader>
-          </Card>
-        ))}
+      {/* Hero image */}
+      <div className="relative w-full aspect-[4/3] sm:aspect-[16/10] rounded-2xl overflow-hidden bg-secondary shadow-xl">
+        <Image
+          key={active.id}
+          src={active.imageUrl}
+          alt={active.challenge}
+          fill
+          priority
+          sizes="(max-width: 1024px) 100vw, 1024px"
+          className="object-cover animate-in fade-in duration-500"
+        />
+
+        {/* Gradient + caption overlay */}
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 sm:p-6 text-white">
+          <div className="inline-block bg-accent text-accent-foreground px-2 py-1 rounded text-xs font-medium mb-2">
+            {active.challenge}
+          </div>
+          <p className="font-serif text-lg sm:text-xl font-semibold">
+            {active.guestName}
+          </p>
+          {active.caption && (
+            <p className="text-sm sm:text-base italic text-white/90 mt-1">
+              “{active.caption}”
+            </p>
+          )}
+          <p className="text-xs text-white/70 mt-2">
+            {new Date(active.timestamp).toLocaleString()}
+          </p>
+        </div>
+
+        {/* Prev / next */}
+        {submissions.length > 1 && (
+          <>
+            <button
+              onClick={prev}
+              aria-label="Previous photo"
+              className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <button
+              onClick={next}
+              aria-label="Next photo"
+              className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </>
+        )}
+
+        {/* Play/pause + counter */}
+        <div className="absolute top-3 right-3 flex items-center gap-2">
+          <span className="px-2 py-1 rounded-full bg-black/40 text-white text-xs font-medium">
+            {activeIndex + 1} / {submissions.length}
+          </span>
+          {submissions.length > 1 && (
+            <button
+              onClick={() => setIsPlaying((p) => !p)}
+              aria-label={isPlaying ? "Pause slideshow" : "Play slideshow"}
+              className="p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+            >
+              {isPlaying ? (
+                <Pause className="w-4 h-4" />
+              ) : (
+                <Play className="w-4 h-4" />
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Thumbnail strip */}
+      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+        {submissions.map((s, i) => {
+          const isActive = i === activeIndex;
+          return (
+            <button
+              key={s.id}
+              ref={(el) => {
+                thumbRefs.current[i] = el;
+              }}
+              onClick={() => {
+                setIsPlaying(false);
+                setActiveIndex(i);
+              }}
+              aria-label={`View photo ${i + 1} by ${s.guestName}`}
+              className={`relative aspect-square rounded-lg overflow-hidden bg-secondary transition-all ${
+                isActive
+                  ? "ring-2 ring-accent ring-offset-2 ring-offset-background scale-[1.02]"
+                  : "opacity-70 hover:opacity-100 hover:scale-[1.02]"
+              }`}
+            >
+              <Image
+                src={s.imageUrl}
+                alt={s.challenge}
+                fill
+                sizes="(max-width: 640px) 25vw, (max-width: 1024px) 16vw, 12vw"
+                className="object-cover"
+              />
+            </button>
+          );
+        })}
       </div>
     </div>
   );
