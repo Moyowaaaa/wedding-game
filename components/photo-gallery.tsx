@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Pause,
+  Play,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 import {
   supabase,
   SUBMISSIONS_TABLE,
@@ -37,6 +44,112 @@ function fromDb(row: DbSubmission): Submission {
 /** Convert a Cloudinary video URL to a jpg poster frame. */
 function videoPoster(url: string): string {
   return url.replace(/\.(mp4|mov|webm|m4v|avi|mkv)(\?|$)/i, ".jpg$2");
+}
+
+/**
+ * Custom video hero: autoplays muted, exposes play/pause + mute/unmute +
+ * scrub bar. Calls onEnded when the video finishes so the slideshow can
+ * advance.
+ */
+function VideoHero({ src, onEnded }: { src: string; onEnded: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(true);
+  const [muted, setMuted] = useState(true);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  const togglePlay = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) v.play();
+    else v.pause();
+  };
+
+  const toggleMute = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.muted = !v.muted;
+    setMuted(v.muted);
+  };
+
+  const handleScrub = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = videoRef.current;
+    if (!v) return;
+    const t = parseFloat(e.target.value);
+    v.currentTime = t;
+    setCurrentTime(t);
+  };
+
+  const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  return (
+    <>
+      <video
+        ref={videoRef}
+        src={src}
+        autoPlay
+        muted
+        playsInline
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+        onEnded={onEnded}
+        onClick={togglePlay}
+        className="absolute inset-0 w-full h-full object-cover bg-black animate-in fade-in duration-500 cursor-pointer"
+      />
+
+      {/* Custom controls bar */}
+      <div className="absolute inset-x-0 top-0 p-3 flex items-center gap-2 pointer-events-none">
+        <button
+          onClick={togglePlay}
+          aria-label={playing ? "Pause video" : "Play video"}
+          className="pointer-events-auto p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors"
+        >
+          {playing ? (
+            <Pause className="w-4 h-4" />
+          ) : (
+            <Play className="w-4 h-4 fill-white" />
+          )}
+        </button>
+        <button
+          onClick={toggleMute}
+          aria-label={muted ? "Unmute" : "Mute"}
+          className="pointer-events-auto p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors"
+        >
+          {muted ? (
+            <VolumeX className="w-4 h-4" />
+          ) : (
+            <Volume2 className="w-4 h-4" />
+          )}
+        </button>
+        {muted && (
+          <span className="pointer-events-none px-2 py-1 rounded-full bg-black/50 text-white text-[11px] font-medium">
+            Tap to unmute
+          </span>
+        )}
+      </div>
+
+      {/* Scrub bar */}
+      <div className="absolute inset-x-0 bottom-0 pb-24 sm:pb-32 px-4 sm:px-6 pointer-events-none">
+        <div className="pointer-events-auto group">
+          <input
+            type="range"
+            min={0}
+            max={duration || 0}
+            step={0.01}
+            value={currentTime}
+            onChange={handleScrub}
+            aria-label="Seek"
+            className="w-full h-1 appearance-none bg-white/30 rounded-full outline-none cursor-pointer"
+            style={{
+              background: `linear-gradient(to right, #f09a36 ${pct}%, rgba(255,255,255,0.3) ${pct}%)`,
+            }}
+          />
+        </div>
+      </div>
+    </>
+  );
 }
 
 export function PhotoGallery() {
@@ -186,17 +299,12 @@ export function PhotoGallery() {
       {/* Hero media */}
       <div className="relative w-full flex-1 min-h-0 sm:flex-none sm:aspect-[16/10] sm:rounded-2xl overflow-hidden bg-secondary sm:shadow-xl">
         {active.mediaType === "video" ? (
-          <video
+          <VideoHero
             key={active.id}
             src={active.imageUrl}
-            autoPlay
-            muted
-            playsInline
-            controls
             onEnded={() => {
               if (isPlaying) next();
             }}
-            className="absolute inset-0 w-full h-full object-cover bg-black animate-in fade-in duration-500"
           />
         ) : (
           <Image
