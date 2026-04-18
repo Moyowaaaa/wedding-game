@@ -20,8 +20,9 @@ export function PhotoCapture({
   const [isCapturing, setIsCapturing] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
+  const photoUploadRef = useRef<HTMLInputElement>(null);
+  const videoUploadRef = useRef<HTMLInputElement>(null);
+  const videoCaptureRef = useRef<HTMLInputElement>(null);
 
   const startCamera = async () => {
     try {
@@ -94,8 +95,9 @@ export function PhotoCapture({
     }
     setPreview(undefined);
     setPreviewType("image");
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    if (videoInputRef.current) videoInputRef.current.value = "";
+    if (photoUploadRef.current) photoUploadRef.current.value = "";
+    if (videoUploadRef.current) videoUploadRef.current.value = "";
+    if (videoCaptureRef.current) videoCaptureRef.current.value = "";
   };
 
   if (preview) {
@@ -176,30 +178,45 @@ export function PhotoCapture({
             Take a Photo
           </Button>
           <Button
-            onClick={() => videoInputRef.current?.click()}
+            onClick={() => videoCaptureRef.current?.click()}
             variant="outline"
             className="w-full"
           >
             <Video className="w-4 h-4 mr-2" />
             Record a Video
           </Button>
-          <Button
-            onClick={() => fileInputRef.current?.click()}
-            variant="outline"
-            className="w-full"
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            Upload Photo or Video
-          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              onClick={() => photoUploadRef.current?.click()}
+              variant="outline"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Upload Photo
+            </Button>
+            <Button
+              onClick={() => videoUploadRef.current?.click()}
+              variant="outline"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Upload Video
+            </Button>
+          </div>
           <input
-            ref={fileInputRef}
+            ref={photoUploadRef}
             type="file"
-            accept="image/*,video/*"
+            accept="image/*"
             onChange={handleFileUpload}
             className="hidden"
           />
           <input
-            ref={videoInputRef}
+            ref={videoUploadRef}
+            type="file"
+            accept="video/*"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+          <input
+            ref={videoCaptureRef}
             type="file"
             accept="video/*"
             capture="environment"

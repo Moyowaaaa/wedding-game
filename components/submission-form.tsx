@@ -31,7 +31,16 @@ function uploadWithProgress(
           reject(new Error("Invalid server response"));
         }
       } else {
-        reject(new Error(`Upload failed (${xhr.status})`));
+        let detail = "";
+        try {
+          const body = JSON.parse(xhr.responseText);
+          detail = body?.detail || body?.error || "";
+        } catch {}
+        reject(
+          new Error(
+            `Upload failed (${xhr.status})${detail ? `: ${detail}` : ""}`,
+          ),
+        );
       }
     };
     xhr.onerror = () => reject(new Error("Network error during upload"));
@@ -182,7 +191,7 @@ export function SubmissionForm({
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">
                   {stage === "uploading"
-                    ? `Uploading photo… ${progress}%`
+                    ? `Uploading… ${progress}%`
                     : "Saving submission…"}
                 </span>
                 {stage === "saving" && (

@@ -9,6 +9,8 @@ import {
   Play,
   Volume2,
   VolumeX,
+  Maximize2,
+  X,
 } from "lucide-react";
 import {
   supabase,
@@ -83,7 +85,7 @@ function VideoHero({ src, onEnded }: { src: string; onEnded: () => void }) {
   const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <>
+    <div className="group absolute inset-0">
       <video
         ref={videoRef}
         src={src}
@@ -96,7 +98,7 @@ function VideoHero({ src, onEnded }: { src: string; onEnded: () => void }) {
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
         onEnded={onEnded}
         onClick={togglePlay}
-        className="absolute inset-0 w-full h-full object-cover bg-black animate-in fade-in duration-500 cursor-pointer"
+        className="absolute inset-0 w-full h-full object-cover bg-black animate-in fade-in duration-500 cursor-pointer peer"
       />
 
       {/* Custom controls bar */}
@@ -132,7 +134,7 @@ function VideoHero({ src, onEnded }: { src: string; onEnded: () => void }) {
 
       {/* Scrub bar */}
       <div className="absolute inset-x-0 bottom-0 pb-24 sm:pb-32 px-4 sm:px-6 pointer-events-none">
-        <div className="pointer-events-auto group">
+        <div className="pointer-events-auto">
           <input
             type="range"
             min={0}
@@ -141,14 +143,14 @@ function VideoHero({ src, onEnded }: { src: string; onEnded: () => void }) {
             value={currentTime}
             onChange={handleScrub}
             aria-label="Seek"
-            className="w-full h-1 appearance-none bg-white/30 rounded-full outline-none cursor-pointer"
+            className="w-full h-1 appearance-none bg-white/30 rounded-full outline-none cursor-pointer opacity-0 transition-opacity duration-200 group-hover:opacity-100 peer-hover:opacity-100"
             style={{
               background: `linear-gradient(to right, #f09a36 ${pct}%, rgba(255,255,255,0.3) ${pct}%)`,
             }}
           />
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -157,6 +159,7 @@ export function PhotoGallery() {
   const [loading, setLoading] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const thumbRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   useEffect(() => {
@@ -248,7 +251,7 @@ export function PhotoGallery() {
 
   // Keep active thumbnail in view
   useEffect(() => {
-    const el = thumbRefs.current[activeIndex];
+    const el = thumbRefs.current?.[activeIndex];
     el?.scrollIntoView({
       behavior: "smooth",
       block: "nearest",
@@ -285,139 +288,201 @@ export function PhotoGallery() {
   const active = submissions[activeIndex];
 
   return (
-    <div className="flex flex-col h-svh sm:h-auto sm:space-y-6">
-      <div className="hidden sm:block text-center mb-2">
-        <h2 className="text-3xl font-serif font-bold text-foreground mb-2">
-          Guest Photos
-        </h2>
-        <p className="text-muted-foreground">
-          {submissions.length} photo{submissions.length === 1 ? "" : "s"}{" "}
-          uploaded
-        </p>
-      </div>
-
-      {/* Hero media */}
-      <div className="relative w-full flex-1 min-h-0 sm:flex-none sm:aspect-[16/10] sm:rounded-2xl overflow-hidden bg-secondary sm:shadow-xl">
-        {active.mediaType === "video" ? (
-          <VideoHero
-            key={active.id}
-            src={active.imageUrl}
-            onEnded={() => {
-              if (isPlaying) next();
-            }}
-          />
-        ) : (
-          <Image
-            key={active.id}
-            src={active.imageUrl}
-            alt={active.challenge}
-            fill
-            priority
-            sizes="(max-width: 1024px) 100vw, 1024px"
-            className="object-cover animate-in fade-in duration-500"
-          />
-        )}
-
-        {/* Gradient + caption overlay */}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 sm:p-6 text-white">
-          <div className="inline-block bg-accent text-accent-foreground px-2 py-1 rounded text-xs font-medium mb-2">
-            {active.challenge}
-          </div>
-          <p className="font-serif text-lg sm:text-xl font-semibold">
-            {active.guestName}
+    <>
+      <div className="flex flex-col h-svh sm:h-auto sm:space-y-6">
+        <div className="hidden sm:block text-center mb-2">
+          <h2 className="text-3xl font-serif font-bold text-foreground mb-2">
+            Guest Media
+          </h2>
+          <p className="text-muted-foreground">
+            {submissions.length} photo{submissions.length === 1 ? "" : "s"}
+            /video
+            {submissions.length === 1 ? "" : "s"} uploaded
           </p>
-          {active.caption && (
-            <p className="text-sm sm:text-base italic text-white/90 mt-1">
-              “{active.caption}”
+        </div>
+
+        {/* Hero media */}
+        <div className="relative w-full flex-1 min-h-0 sm:flex-none sm:aspect-[16/10] sm:rounded-2xl overflow-hidden bg-secondary sm:shadow-xl">
+          {active.mediaType === "video" ? (
+            <VideoHero
+              key={active.id}
+              src={active.imageUrl}
+              onEnded={() => {
+                if (isPlaying) next();
+              }}
+            />
+          ) : (
+            <Image
+              key={active.id}
+              src={active.imageUrl}
+              alt={active.challenge}
+              fill
+              priority
+              sizes="(max-width: 1024px) 100vw, 1024px"
+              className="object-cover animate-in fade-in duration-500"
+            />
+          )}
+
+          {/* Gradient + caption overlay */}
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 sm:p-6 text-white">
+            <div className="inline-block bg-accent text-accent-foreground px-2 py-1 rounded text-xs font-medium mb-2">
+              {active.challenge}
+            </div>
+            <p className="font-serif text-lg sm:text-xl font-semibold">
+              {active.guestName}
             </p>
-          )}
-          <p className="text-xs text-white/70 mt-2">
-            {new Date(active.timestamp).toLocaleString()}
-          </p>
+            {active.caption && (
+              <p className="text-sm sm:text-base italic text-white/90 mt-1">
+                “{active.caption}”
+              </p>
+            )}
+            <p className="text-xs text-white/70 mt-2">
+              {new Intl.DateTimeFormat("en-GB", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              }).format(new Date(active.timestamp))}{" "}
+              at{" "}
+              {new Intl.DateTimeFormat("en-GB", {
+                hour: "2-digit",
+                minute: "2-digit",
+              }).format(new Date(active.timestamp))}
+            </p>
+          </div>
+
+          {/* Controls overlay */}
+          <div className="absolute inset-0 pointer-events-none">
+            {/* Prev / next */}
+            {submissions.length > 1 && (
+              <>
+                <button
+                  onClick={prev}
+                  aria-label="Previous photo"
+                  className="pointer-events-auto absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={next}
+                  aria-label="Next photo"
+                  className="pointer-events-auto absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </>
+            )}
+
+            {/* Fullscreen toggle */}
+            <button
+              onClick={() => setIsFullscreen(true)}
+              aria-label="Fullscreen"
+              className="pointer-events-auto absolute top-3 right-3 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
-        {/* Prev / next */}
-        {submissions.length > 1 && (
-          <>
-            <button
-              onClick={prev}
-              aria-label="Previous photo"
-              className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <button
-              onClick={next}
-              aria-label="Next photo"
-              className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </>
-        )}
-
-        {/* Play/pause + counter */}
-        <div className="absolute top-3 right-3 flex items-center gap-2">
-          <span className="px-2 py-1 rounded-full bg-black/40 text-white text-xs font-medium">
-            {activeIndex + 1} / {submissions.length}
-          </span>
-          {submissions.length > 1 && (
-            <button
-              onClick={() => setIsPlaying((p) => !p)}
-              aria-label={isPlaying ? "Pause slideshow" : "Play slideshow"}
-              className="p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
-            >
-              {isPlaying ? (
-                <Pause className="w-4 h-4" />
-              ) : (
-                <Play className="w-4 h-4" />
-              )}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Thumbnail strip: horizontal scroll on mobile, grid on desktop */}
-      <div className="flex sm:grid sm:grid-cols-6 md:grid-cols-8 gap-2 overflow-x-auto sm:overflow-visible px-2 pt-2 pb-[env(safe-area-inset-bottom)] sm:p-0 bg-background/80 backdrop-blur-sm sm:bg-transparent sm:backdrop-blur-none snap-x snap-mandatory sm:snap-none">
-        {submissions.map((s, i) => {
-          const isActive = i === activeIndex;
-          return (
-            <button
-              key={s.id}
-              ref={(el) => {
-                thumbRefs.current[i] = el;
-              }}
-              onClick={() => {
-                setIsPlaying(false);
-                setActiveIndex(i);
-              }}
-              aria-label={`View photo ${i + 1} by ${s.guestName}`}
-              className={`relative shrink-0 sm:shrink w-20 sm:w-auto aspect-square rounded-lg overflow-hidden bg-secondary transition-all snap-start ${
-                isActive
-                  ? "ring-2 ring-accent ring-offset-2 ring-offset-background scale-[1.02]"
-                  : "opacity-70 hover:opacity-100 hover:scale-[1.02]"
-              }`}
-            >
-              <Image
-                src={
-                  s.mediaType === "video" ? videoPoster(s.imageUrl) : s.imageUrl
-                }
-                alt={s.challenge}
-                fill
-                sizes="(max-width: 640px) 25vw, (max-width: 1024px) 16vw, 12vw"
-                className="object-cover"
-              />
-              {s.mediaType === "video" && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                  <div className="w-8 h-8 rounded-full bg-black/60 flex items-center justify-center">
-                    <Play className="w-4 h-4 text-white fill-white ml-0.5" />
+        {/* Thumbnail strip: horizontal scroll on mobile, grid on desktop */}
+        <div className="flex sm:grid sm:grid-cols-6 md:grid-cols-8 gap-2 overflow-x-auto sm:overflow-visible px-2 pt-2 pb-[env(safe-area-inset-bottom)] sm:p-0 bg-background/80 backdrop-blur-sm sm:bg-transparent sm:backdrop-blur-none snap-x snap-mandatory sm:snap-none">
+          {submissions.map((s, i) => {
+            const isActive = i === activeIndex;
+            return (
+              <button
+                key={s.id}
+                ref={(el) => {
+                  thumbRefs.current[i] = el;
+                }}
+                onClick={() => {
+                  setIsPlaying(false);
+                  setActiveIndex(i);
+                }}
+                aria-label={`View photo ${i + 1} by ${s.guestName}`}
+                className={`relative shrink-0 sm:shrink w-20 sm:w-auto aspect-square rounded-lg overflow-hidden bg-secondary transition-all snap-start ${
+                  isActive
+                    ? "ring-2 ring-accent ring-offset-2 ring-offset-background scale-[1.02]"
+                    : "opacity-70 hover:opacity-100 hover:scale-[1.02]"
+                }`}
+              >
+                <Image
+                  src={
+                    s.mediaType === "video"
+                      ? videoPoster(s.imageUrl)
+                      : s.imageUrl
+                  }
+                  alt={s.challenge}
+                  fill
+                  sizes="(max-width: 640px) 25vw, (max-width: 1024px) 16vw, 12vw"
+                  className="object-cover"
+                />
+                {s.mediaType === "video" && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                    <div className="w-8 h-8 rounded-full bg-black/60 flex items-center justify-center">
+                      <Play className="w-4 h-4 text-white fill-white ml-0.5" />
+                    </div>
                   </div>
-                </div>
-              )}
-            </button>
-          );
-        })}
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
-    </div>
+
+      {/* Fullscreen modal */}
+      {isFullscreen && (
+        <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4">
+          <button
+            onClick={() => setIsFullscreen(false)}
+            aria-label="Exit fullscreen"
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
+
+          <div className="relative w-full h-full max-w-6xl max-h-[90vh]">
+            {active.mediaType === "video" ? (
+              <VideoHero
+                key={active.id}
+                src={active.imageUrl}
+                onEnded={() => {
+                  if (isPlaying) next();
+                }}
+              />
+            ) : (
+              <Image
+                key={active.id}
+                src={active.imageUrl}
+                alt={active.challenge}
+                fill
+                sizes="100vw"
+                className="object-contain"
+              />
+            )}
+
+            {/* Fullscreen controls */}
+            <div className="absolute inset-0 pointer-events-none">
+              {submissions.length > 1 && (
+                <>
+                  <button
+                    onClick={prev}
+                    aria-label="Previous photo"
+                    className="pointer-events-auto absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+                  <button
+                    onClick={next}
+                    aria-label="Next photo"
+                    className="pointer-events-auto absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+                  >
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
