@@ -100,6 +100,7 @@ export function SubmissionForm({
           challenge: challengeData?.title || "",
           caption,
           imageUrl,
+          mediaType: photoFile.type.startsWith("video/") ? "video" : "image",
         }),
       });
 

@@ -7,6 +7,7 @@ import {
   supabase,
   SUBMISSIONS_TABLE,
   type Submission as DbSubmission,
+  type MediaType,
 } from "@/lib/supabase";
 
 const AUTOPLAY_MS = 4500;
@@ -17,6 +18,7 @@ interface Submission {
   challenge: string;
   caption: string;
   imageUrl: string;
+  mediaType: MediaType;
   timestamp: string;
 }
 
@@ -27,8 +29,14 @@ function fromDb(row: DbSubmission): Submission {
     challenge: row.challenge,
     caption: row.caption ?? "",
     imageUrl: row.image_url,
+    mediaType: row.media_type ?? "image",
     timestamp: row.created_at,
   };
+}
+
+/** Convert a Cloudinary video URL to a jpg poster frame. */
+function videoPoster(url: string): string {
+  return url.replace(/\.(mp4|mov|webm|m4v|avi|mkv)(\?|$)/i, ".jpg$2");
 }
 
 export function PhotoGallery() {
@@ -99,14 +107,17 @@ export function PhotoGallery() {
   const next = useCallback(() => goTo(activeIndex + 1), [activeIndex, goTo]);
   const prev = useCallback(() => goTo(activeIndex - 1), [activeIndex, goTo]);
 
-  // Autoplay
+  // Autoplay — pauses the timer when the active item is a video
+  // (video advances on its `ended` event instead).
   useEffect(() => {
     if (!isPlaying || submissions.length <= 1) return;
+    const active = submissions[activeIndex];
+    if (active?.mediaType === "video") return;
     const t = setInterval(() => {
       setActiveIndex((i) => (i + 1) % submissions.length);
     }, AUTOPLAY_MS);
     return () => clearInterval(t);
-  }, [isPlaying, submissions.length]);
+  }, [isPlaying, submissions, activeIndex]);
 
   // Keyboard nav
   useEffect(() => {
@@ -161,8 +172,8 @@ export function PhotoGallery() {
   const active = submissions[activeIndex];
 
   return (
-    <div className="space-y-6">
-      <div className="text-center mb-2">
+    <div className="flex flex-col h-svh sm:h-auto sm:space-y-6">
+      <div className="hidden sm:block text-center mb-2">
         <h2 className="text-3xl font-serif font-bold text-foreground mb-2">
           Guest Photos
         </h2>
@@ -172,17 +183,32 @@ export function PhotoGallery() {
         </p>
       </div>
 
-      {/* Hero image */}
-      <div className="relative w-full aspect-[4/3] sm:aspect-[16/10] rounded-2xl overflow-hidden bg-secondary shadow-xl">
-        <Image
-          key={active.id}
-          src={active.imageUrl}
-          alt={active.challenge}
-          fill
-          priority
-          sizes="(max-width: 1024px) 100vw, 1024px"
-          className="object-cover animate-in fade-in duration-500"
-        />
+      {/* Hero media */}
+      <div className="relative w-full flex-1 min-h-0 sm:flex-none sm:aspect-[16/10] sm:rounded-2xl overflow-hidden bg-secondary sm:shadow-xl">
+        {active.mediaType === "video" ? (
+          <video
+            key={active.id}
+            src={active.imageUrl}
+            autoPlay
+            muted
+            playsInline
+            controls
+            onEnded={() => {
+              if (isPlaying) next();
+            }}
+            className="absolute inset-0 w-full h-full object-cover bg-black animate-in fade-in duration-500"
+          />
+        ) : (
+          <Image
+            key={active.id}
+            src={active.imageUrl}
+            alt={active.challenge}
+            fill
+            priority
+            sizes="(max-width: 1024px) 100vw, 1024px"
+            className="object-cover animate-in fade-in duration-500"
+          />
+        )}
 
         {/* Gradient + caption overlay */}
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 sm:p-6 text-white">
@@ -243,8 +269,8 @@ export function PhotoGallery() {
         </div>
       </div>
 
-      {/* Thumbnail strip */}
-      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+      {/* Thumbnail strip: horizontal scroll on mobile, grid on desktop */}
+      <div className="flex sm:grid sm:grid-cols-6 md:grid-cols-8 gap-2 overflow-x-auto sm:overflow-visible px-2 pt-2 pb-[env(safe-area-inset-bottom)] sm:p-0 bg-background/80 backdrop-blur-sm sm:bg-transparent sm:backdrop-blur-none snap-x snap-mandatory sm:snap-none">
         {submissions.map((s, i) => {
           const isActive = i === activeIndex;
           return (
@@ -258,19 +284,28 @@ export function PhotoGallery() {
                 setActiveIndex(i);
               }}
               aria-label={`View photo ${i + 1} by ${s.guestName}`}
-              className={`relative aspect-square rounded-lg overflow-hidden bg-secondary transition-all ${
+              className={`relative shrink-0 sm:shrink w-20 sm:w-auto aspect-square rounded-lg overflow-hidden bg-secondary transition-all snap-start ${
                 isActive
                   ? "ring-2 ring-accent ring-offset-2 ring-offset-background scale-[1.02]"
                   : "opacity-70 hover:opacity-100 hover:scale-[1.02]"
               }`}
             >
               <Image
-                src={s.imageUrl}
+                src={
+                  s.mediaType === "video" ? videoPoster(s.imageUrl) : s.imageUrl
+                }
                 alt={s.challenge}
                 fill
                 sizes="(max-width: 640px) 25vw, (max-width: 1024px) 16vw, 12vw"
                 className="object-cover"
               />
+              {s.mediaType === "video" && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                  <div className="w-8 h-8 rounded-full bg-black/60 flex items-center justify-center">
+                    <Play className="w-4 h-4 text-white fill-white ml-0.5" />
+                  </div>
+                </div>
+              )}
             </button>
           );
         })}

@@ -15,6 +15,7 @@ function toClient(row: Submission) {
     challenge: row.challenge,
     caption: row.caption ?? "",
     imageUrl: row.image_url,
+    mediaType: row.media_type ?? "image",
     timestamp: row.created_at,
   };
 }
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
     const caption = typeof body.caption === "string" ? body.caption.trim() : "";
     const imageUrl =
       typeof body.imageUrl === "string" ? body.imageUrl.trim() : "";
+    const mediaType = body.mediaType === "video" ? "video" : "image";
 
     if (!guestName || !challenge || !imageUrl) {
       return NextResponse.json(
@@ -66,6 +68,7 @@ export async function POST(request: NextRequest) {
         challenge,
         caption: caption || null,
         image_url: imageUrl,
+        media_type: mediaType,
       })
       .select("*")
       .single();

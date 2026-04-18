@@ -9,6 +9,8 @@ create table if not exists public.submissions (
   challenge    text        not null,
   caption      text,
   image_url    text        not null,
+  media_type   text        not null default 'image'
+               check (media_type in ('image', 'video')),
   created_at   timestamptz not null default now()
 );
 
