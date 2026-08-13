@@ -83,11 +83,11 @@ export function PhotoCapture({
     if (file) {
       const isVideo = file.type.startsWith("video/");
 
-      // Check file size limits
-      const maxSize = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024; // 100MB for videos, 10MB for photos
+      // Match Cloudinary Free plan: images 10MB, videos capped at 50MB
+      const maxSize = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
       if (file.size > maxSize) {
         alert(
-          `File too large! ${isVideo ? "Videos" : "Photos"} must be under ${isVideo ? "100MB" : "10MB"}.`,
+          `File too large! ${isVideo ? "Videos" : "Photos"} must be under ${isVideo ? "50MB" : "10MB"}.`,
         );
         e.target.value = ""; // Clear the input
         return;
@@ -213,7 +213,7 @@ export function PhotoCapture({
             </Button>
           </div>
           <p className="text-xs text-muted-foreground text-center">
-            Photos: max 10MB | Videos: max 100MB
+            Photos: max 10MB | Videos: max 50MB
           </p>
           <input
             ref={photoUploadRef}
