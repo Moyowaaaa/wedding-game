@@ -11,164 +11,64 @@ const GUEST_NAME_KEY = "wedding-guest-name";
 
 type UploadStage = "idle" | "uploading" | "saving" | "done";
 
-// ~6MB chunks: large enough to keep per-chunk overhead low, small enough
-// that a flaky mobile connection can retry one without losing much progress.
-const CHUNK_SIZE = 6 * 1024 * 1024;
-const MAX_RETRIES_PER_CHUNK = 4;
-
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
 /**
- * POSTs a single chunk (or a whole small file) to Cloudinary with XHR so we
- * get real upload progress. Used by both single-shot and chunked paths.
+ * PUT a file to an S3 presigned URL with upload progress.
  */
-function xhrUpload(
-  url: string,
-  formData: FormData,
-  headers: Record<string, string>,
-  onChunkProgress: (loaded: number, total: number) => void,
-): Promise<{ status: number; body: any }> {
+function uploadToPresignedUrl(
+  uploadUrl: string,
+  file: File,
+  onProgress: (pct: number) => void,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", url);
-    for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
+    xhr.open("PUT", uploadUrl);
+    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
 
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onChunkProgress(e.loaded, e.total);
+      if (e.lengthComputable) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
     };
     xhr.onload = () => {
-      let body: any = null;
-      try {
-        body = xhr.responseText ? JSON.parse(xhr.responseText) : null;
-      } catch {
-        // non-JSON response (e.g. intermediate 200 with empty body is fine)
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+        return;
       }
-      resolve({ status: xhr.status, body });
+      reject(new Error(`Upload failed (${xhr.status})`));
     };
     xhr.onerror = () => reject(new Error("Network error during upload"));
     xhr.ontimeout = () => reject(new Error("Upload timed out"));
-    xhr.send(formData);
+    xhr.send(file);
   });
 }
 
-/**
- * Uploads a file directly to Cloudinary in chunks, with per-chunk retries.
- * Each chunk uses the same signed params and a shared X-Unique-Upload-Id so
- * Cloudinary stitches them back together. Only the final chunk returns the
- * full upload result (secure_url, public_id, etc.).
- *
- * Bypasses Vercel's ~4.5MB serverless body limit because the file never
- * touches our server.
- */
-async function uploadDirectToCloudinary(
+async function uploadDirectToS3(
   file: File,
   onProgress: (pct: number) => void,
-): Promise<any> {
-  // 1. Get a short-lived upload signature from our backend.
-  const sigRes = await fetch("/api/upload");
+): Promise<string> {
+  const sigRes = await fetch("/api/upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contentType: file.type || "application/octet-stream",
+      filename: file.name || "upload",
+    }),
+  });
+
   if (!sigRes.ok) {
     const body = await sigRes.json().catch(() => ({}));
     throw new Error(
-      body?.detail || body?.error || "Failed to get upload signature",
+      body?.detail || body?.error || "Failed to get upload URL",
     );
   }
-  const { signature, timestamp, folder, apiKey, cloudName } =
-    await sigRes.json();
 
-  const resourceType = file.type.startsWith("video/") ? "video" : "image";
-  const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
-
-  const total = file.size;
-  const uniqueId =
-    (typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
-
-  let uploadedBeforeThisChunk = 0;
-  let finalResult: any = null;
-
-  // Small files: one request, no Content-Range needed.
-  const useChunked = total > CHUNK_SIZE;
-
-  const sendChunk = async (start: number, end: number): Promise<any> => {
-    const chunk = file.slice(start, end);
-    const formData = new FormData();
-    formData.append("file", chunk);
-    formData.append("api_key", apiKey);
-    formData.append("timestamp", String(timestamp));
-    formData.append("signature", signature);
-    formData.append("folder", folder);
-
-    const headers: Record<string, string> = {};
-    if (useChunked) {
-      headers["X-Unique-Upload-Id"] = uniqueId;
-      // Cloudinary expects "bytes start-end/total" (end is inclusive).
-      headers["Content-Range"] = `bytes ${start}-${end - 1}/${total}`;
-    }
-
-    let lastErr: any = null;
-    for (let attempt = 0; attempt <= MAX_RETRIES_PER_CHUNK; attempt++) {
-      try {
-        const { status, body } = await xhrUpload(
-          uploadUrl,
-          formData,
-          headers,
-          (loaded) => {
-            const overall = Math.min(
-              total,
-              uploadedBeforeThisChunk + loaded,
-            );
-            onProgress(Math.round((overall / total) * 100));
-          },
-        );
-
-        // 200 = final chunk accepted (or single-shot upload).
-        // 201 = intermediate chunk accepted, more expected.
-        if (status === 200 || status === 201) {
-          return body;
-        }
-
-        // 4xx from Cloudinary = permanent, don't retry.
-        if (status >= 400 && status < 500) {
-          const detail =
-            body?.error?.message || body?.error || `HTTP ${status}`;
-          throw new Error(`Upload rejected: ${detail}`);
-        }
-
-        // 5xx = transient, fall through to retry.
-        lastErr = new Error(
-          body?.error?.message || body?.error || `Upload failed (${status})`,
-        );
-      } catch (err) {
-        lastErr = err;
-      }
-
-      if (attempt < MAX_RETRIES_PER_CHUNK) {
-        // Exponential backoff: 500ms, 1s, 2s, 4s.
-        await sleep(500 * Math.pow(2, attempt));
-      }
-    }
-    throw lastErr || new Error("Upload failed after retries");
-  };
-
-  if (!useChunked) {
-    finalResult = await sendChunk(0, total);
-  } else {
-    for (let start = 0; start < total; start += CHUNK_SIZE) {
-      const end = Math.min(start + CHUNK_SIZE, total);
-      const body = await sendChunk(start, end);
-      uploadedBeforeThisChunk = end;
-      onProgress(Math.round((end / total) * 100));
-      if (end === total) finalResult = body;
-    }
+  const { uploadUrl, publicUrl } = await sigRes.json();
+  if (!uploadUrl || !publicUrl) {
+    throw new Error("Upload URL missing from server response");
   }
 
-  if (!finalResult || !finalResult.secure_url) {
-    throw new Error("Upload completed but no secure_url returned");
-  }
-  return finalResult;
+  await uploadToPresignedUrl(uploadUrl, file, onProgress);
+  return publicUrl as string;
 }
 
 interface SubmissionFormProps {
@@ -226,7 +126,6 @@ export function SubmissionForm({
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    // If still editing, commit the draft first.
     const nameToUse = isEditingName ? nameDraft.trim() : guestName.trim();
     if (!nameToUse) {
       setError("Please enter your name");
@@ -240,16 +139,11 @@ export function SubmissionForm({
     setStage("uploading");
 
     try {
-      // 1. Upload photo/video directly to Cloudinary with real progress.
-      //    Direct upload bypasses Vercel's ~4.5MB serverless body limit.
-      const uploadedData = await uploadDirectToCloudinary(photoFile, (pct) =>
+      const imageUrl = await uploadDirectToS3(photoFile, (pct) =>
         setProgress(pct),
       );
-      const imageUrl = uploadedData.secure_url;
-      if (!imageUrl)
-        throw new Error("Upload succeeded but no image URL returned");
+      if (!imageUrl) throw new Error("Upload succeeded but no URL returned");
 
-      // 2. Save submission metadata (quick, indeterminate)
       setStage("saving");
       setProgress(100);
 
@@ -409,8 +303,7 @@ export function SubmissionForm({
             <Button
               type="submit"
               disabled={
-                isSubmitting ||
-                (!guestName.trim() && !nameDraft.trim())
+                isSubmitting || (!guestName.trim() && !nameDraft.trim())
               }
               className="flex-1 bg-accent hover:bg-accent/90 text-accent-foreground"
             >

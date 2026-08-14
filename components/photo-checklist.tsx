@@ -61,7 +61,34 @@ export function PhotoChecklist({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div className="space-y-3">
+        <div className="space-y-1">
+          <h3 className="text-lg font-serif font-semibold text-primary">
+            Freestyle
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            No prompt needed — capture anything you love.
+          </p>
+        </div>
+        <button
+          onClick={() => onSelectChallenge(FREESTYLE_CHALLENGE.id)}
+          className={`w-full relative p-4 rounded-lg border-2 border-dashed transition-all text-left ${
+            freestyleSelected
+              ? "border-accent bg-accent/5"
+              : "border-border hover:border-accent/50 bg-card"
+          }`}
+        >
+          <div className="text-2xl mb-2">{FREESTYLE_CHALLENGE.emoji}</div>
+          <p className="text-sm font-medium leading-snug">
+            Upload your own moment
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Unlimited — keep sharing after the hunt
+          </p>
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 border-t border-border pt-6">
         {PHOTO_CHALLENGES.map((challenge) => {
           const isCompleted = completedChallenges.has(challenge.id);
           const isSelected = selectedChallenge === challenge.id;
@@ -98,33 +125,6 @@ export function PhotoChecklist({
 
       <div className="pt-2 text-center text-xs text-muted-foreground">
         Completed: {huntCompleted} of {PHOTO_CHALLENGES.length}
-      </div>
-
-      <div className="border-t border-border pt-6 space-y-3">
-        <div className="space-y-1">
-          <h3 className="text-lg font-serif font-semibold text-primary">
-            Freestyle
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            No prompt needed — capture anything you love.
-          </p>
-        </div>
-        <button
-          onClick={() => onSelectChallenge(FREESTYLE_CHALLENGE.id)}
-          className={`w-full relative p-4 rounded-lg border-2 border-dashed transition-all text-left ${
-            freestyleSelected
-              ? "border-accent bg-accent/5"
-              : "border-border hover:border-accent/50 bg-card"
-          }`}
-        >
-          <div className="text-2xl mb-2">{FREESTYLE_CHALLENGE.emoji}</div>
-          <p className="text-sm font-medium leading-snug">
-            Upload your own moment
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Unlimited — keep sharing after the hunt
-          </p>
-        </button>
       </div>
     </div>
   );
