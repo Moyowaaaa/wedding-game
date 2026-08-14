@@ -8,7 +8,7 @@ and it lands in a live gallery.
 
 - Next.js 16 (App Router) + React 19 + TypeScript
 - Tailwind v4 + shadcn/ui
-- Cloudinary (image hosting)
+- AWS S3 (image/video hosting via presigned uploads)
 - Supabase (Postgres + Realtime for the gallery)
 
 ## Setup
@@ -23,7 +23,12 @@ and it lands in a live gallery.
    cp .env.example .env.local
    ```
 
-3. **Cloudinary** — create an account, copy cloud name + API key/secret.
+3. **AWS S3**:
+   - Create a bucket (e.g. `ade-semi-wedding`)
+   - Add a public-read bucket policy for `GetObject`
+   - Configure CORS for browser PUT uploads
+   - Create an IAM user with `s3:PutObject` / `s3:GetObject` on that bucket
+   - Put access key, secret, region, and bucket name in `.env.local`
 
 4. **Supabase**:
    - Create a project at https://supabase.com
@@ -43,15 +48,15 @@ and it lands in a live gallery.
 
 - `app/page.tsx` — guest flow state machine: `checklist → capture → form`
 - `app/gallery/page.tsx` — live gallery (Supabase Realtime subscription)
-- `app/api/upload` — Cloudinary upload proxy
+- `app/api/upload` — S3 presigned PUT URL issuer
 - `app/api/submissions` — Supabase-backed CRUD (GET lists all, POST inserts)
 - `lib/supabase.ts` — browser + server Supabase clients
 
 ## Data flow
 
 ```
-Guest → PhotoCapture → Cloudinary (/api/upload)
-                      → secure_url → /api/submissions (POST)
+Guest → PhotoCapture → S3 (/api/upload presign → PUT)
+                      → public URL → /api/submissions (POST)
                                       → Supabase INSERT
                                           → Realtime event
                                               → PhotoGallery updates live

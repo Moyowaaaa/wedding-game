@@ -43,11 +43,6 @@ function fromDb(row: DbSubmission): Submission {
   };
 }
 
-/** Convert a Cloudinary video URL to a jpg poster frame. */
-function videoPoster(url: string): string {
-  return url.replace(/\.(mp4|mov|webm|m4v|avi|mkv)(\?|$)/i, ".jpg$2");
-}
-
 /**
  * Custom video hero: autoplays muted, exposes play/pause + mute/unmute +
  * scrub bar. Calls onEnded when the video finishes so the slideshow can
@@ -318,6 +313,7 @@ export function PhotoGallery() {
               alt={active.challenge}
               fill
               priority
+              loading="eager"
               sizes="(max-width: 1024px) 100vw, 1024px"
               className="object-cover animate-in fade-in duration-500"
             />
@@ -404,17 +400,23 @@ export function PhotoGallery() {
                     : "opacity-70 hover:opacity-100 hover:scale-[1.02]"
                 }`}
               >
-                <Image
-                  src={
-                    s.mediaType === "video"
-                      ? videoPoster(s.imageUrl)
-                      : s.imageUrl
-                  }
-                  alt={s.challenge}
-                  fill
-                  sizes="(max-width: 640px) 25vw, (max-width: 1024px) 16vw, 12vw"
-                  className="object-cover"
-                />
+                {s.mediaType === "video" ? (
+                  <video
+                    src={s.imageUrl}
+                    muted
+                    playsInline
+                    preload="metadata"
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                ) : (
+                  <Image
+                    src={s.imageUrl}
+                    alt={s.challenge}
+                    fill
+                    sizes="(max-width: 640px) 25vw, (max-width: 1024px) 16vw, 12vw"
+                    className="object-cover"
+                  />
+                )}
                 {s.mediaType === "video" && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                     <div className="w-8 h-8 rounded-full bg-black/60 flex items-center justify-center">
