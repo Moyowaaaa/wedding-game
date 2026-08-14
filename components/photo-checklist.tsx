@@ -1,16 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
 
 export const PHOTO_CHALLENGES = [
   { id: 1, title: "The Bride & Groom", emoji: "👰🤵" },
   { id: 2, title: "Close-up of the Ring(s)", emoji: "💍" },
   { id: 3, title: "The Wedding Cake", emoji: "🎂" },
-  { id: 4, title: "Champagne Toast Moment", emoji: "🍾" },
-  { id: 5, title: "The Bouquet", emoji: "💐" },
+  // { id: 4, title: "Champagne Toast Moment", emoji: "🍾" },
+  // { id: 5, title: "The Bouquet", emoji: "💐" },
   { id: 6, title: "Your Table's Group Photo", emoji: "👨‍👩‍👧‍👦" },
   { id: 7, title: "Someone Dancing", emoji: "💃" },
   { id: 8, title: "The DJ/Band/Music Setup", emoji: "🎵" },
@@ -23,6 +20,22 @@ export const PHOTO_CHALLENGES = [
   { id: 15, title: "Everyone Celebrating Together", emoji: "🎉" },
 ];
 
+/** Open upload outside the scavenger hunt — does not count toward the 15. */
+export const FREESTYLE_CHALLENGE = {
+  id: 16,
+  title: "Freestyle",
+  emoji: "✨",
+};
+
+export function getChallengeById(id: number) {
+  if (id === FREESTYLE_CHALLENGE.id) return FREESTYLE_CHALLENGE;
+  return PHOTO_CHALLENGES.find((c) => c.id === id);
+}
+
+export function countHuntCompletions(completed: Set<number>) {
+  return PHOTO_CHALLENGES.filter((c) => completed.has(c.id)).length;
+}
+
 interface PhotoChecklistProps {
   selectedChallenge: number | null;
   completedChallenges: Set<number>;
@@ -34,8 +47,11 @@ export function PhotoChecklist({
   completedChallenges,
   onSelectChallenge,
 }: PhotoChecklistProps) {
+  const huntCompleted = countHuntCompletions(completedChallenges);
+  const freestyleSelected = selectedChallenge === FREESTYLE_CHALLENGE.id;
+
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full space-y-6">
       <div className="space-y-2">
         <h2 className="text-2xl font-serif font-semibold text-primary">
           Photo Scavenger Hunt
@@ -81,7 +97,34 @@ export function PhotoChecklist({
       </div>
 
       <div className="pt-2 text-center text-xs text-muted-foreground">
-        Completed: {completedChallenges.size} of {PHOTO_CHALLENGES.length}
+        Completed: {huntCompleted} of {PHOTO_CHALLENGES.length}
+      </div>
+
+      <div className="border-t border-border pt-6 space-y-3">
+        <div className="space-y-1">
+          <h3 className="text-lg font-serif font-semibold text-primary">
+            Freestyle
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            No prompt needed — capture anything you love.
+          </p>
+        </div>
+        <button
+          onClick={() => onSelectChallenge(FREESTYLE_CHALLENGE.id)}
+          className={`w-full relative p-4 rounded-lg border-2 border-dashed transition-all text-left ${
+            freestyleSelected
+              ? "border-accent bg-accent/5"
+              : "border-border hover:border-accent/50 bg-card"
+          }`}
+        >
+          <div className="text-2xl mb-2">{FREESTYLE_CHALLENGE.emoji}</div>
+          <p className="text-sm font-medium leading-snug">
+            Upload your own moment
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Unlimited — keep sharing after the hunt
+          </p>
+        </button>
       </div>
     </div>
   );

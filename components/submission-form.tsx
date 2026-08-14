@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { PHOTO_CHALLENGES } from "./photo-checklist";
+import { getChallengeById } from "./photo-checklist";
 import { Loader2, Pencil } from "lucide-react";
 
 const GUEST_NAME_KEY = "wedding-guest-name";
@@ -195,7 +195,7 @@ export function SubmissionForm({
 
   const isSubmitting = stage === "uploading" || stage === "saving";
 
-  const challengeData = PHOTO_CHALLENGES.find((c) => c.id === challenge);
+  const challengeData = getChallengeById(challenge);
 
   useEffect(() => {
     const saved = localStorage.getItem(GUEST_NAME_KEY)?.trim() ?? "";
