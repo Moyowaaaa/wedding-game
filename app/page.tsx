@@ -1,7 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { PhotoChecklist } from '@/components/photo-checklist'
+import {
+  PhotoChecklist,
+  PHOTO_CHALLENGES,
+  countHuntCompletions,
+} from '@/components/photo-checklist'
 import { PhotoCapture } from '@/components/photo-capture'
 import { SubmissionForm } from '@/components/submission-form'
 import { Card } from '@/components/ui/card'
@@ -91,9 +95,13 @@ export default function Home() {
         {/* Footer Stats */}
         <div className="text-center text-sm text-muted-foreground">
           <p>
-            You&apos;ve completed <span className="font-semibold text-primary">
-              {completedChallenges.size}
-            </span> out of <span className="font-semibold">15</span> challenges!
+            You&apos;ve completed{' '}
+            <span className="font-semibold text-primary">
+              {countHuntCompletions(completedChallenges)}
+            </span>{' '}
+            out of{' '}
+            <span className="font-semibold">{PHOTO_CHALLENGES.length}</span>{' '}
+            challenges!
           </p>
         </div>
       </div>
