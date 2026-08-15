@@ -21,6 +21,7 @@ export function PhotoCapture({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const photoUploadRef = useRef<HTMLInputElement>(null);
+  const photoCaptureRef = useRef<HTMLInputElement>(null);
   const videoUploadRef = useRef<HTMLInputElement>(null);
   const videoCaptureRef = useRef<HTMLInputElement>(null);
 
@@ -106,6 +107,7 @@ export function PhotoCapture({
     setPreview(undefined);
     setPreviewType("image");
     if (photoUploadRef.current) photoUploadRef.current.value = "";
+    if (photoCaptureRef.current) photoCaptureRef.current.value = "";
     if (videoUploadRef.current) videoUploadRef.current.value = "";
     if (videoCaptureRef.current) videoCaptureRef.current.value = "";
   };
@@ -181,7 +183,7 @@ export function PhotoCapture({
         </div>
         <div className="flex flex-col gap-2">
           <Button
-            onClick={startCamera}
+            onClick={() => photoCaptureRef.current?.click()}
             className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             <Camera className="w-4 h-4 mr-2" />
@@ -214,6 +216,14 @@ export function PhotoCapture({
           <p className="text-xs text-muted-foreground text-center">
             Photos: max 20MB | Videos: max 100MB
           </p>
+          <input
+            ref={photoCaptureRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
           <input
             ref={photoUploadRef}
             type="file"
